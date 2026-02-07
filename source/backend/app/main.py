@@ -6,6 +6,7 @@ from .config import settings
 from .db import check_db_connection
 from .image_pipeline import preprocess_image, segment_image
 from .schemas import JobCreateResponse, JobStatusResponse
+from .shape_engine import build_shape_proxy, compute_dimensions, compute_quality_metrics
 from .store import InMemoryJobStore, JobMeta, LocalFileStorage, utcnow
 
 app = FastAPI(title=settings.app_name)
@@ -48,13 +49,40 @@ async def create_job(file: UploadFile = File(...)) -> JobCreateResponse:
     try:
         preprocess_meta = preprocess_image(content)
         segment_meta = segment_image(content)
+
+        shape_proxy = build_shape_proxy(preprocess_meta, segment_meta)
+        dimensions_mm = compute_dimensions(preprocess_meta, segment_meta)
+        volume_mm3 = round(
+            dimensions_mm['width'] * dimensions_mm['height'] * dimensions_mm['depth'],
+            3,
+        )
+        engine_quality = compute_quality_metrics(preprocess_meta, segment_meta)
+
         quality_metrics = {
             'preprocess': preprocess_meta,
             'segmentation': segment_meta,
+            'shape_engine': engine_quality,
         }
-        job_store.update(job_id, status='processed', quality_metrics=quality_metrics, error_message=None)
+
+        job_store.update(
+            job_id,
+            status='processed',
+            quality_metrics=quality_metrics,
+            dimensions_mm=dimensions_mm,
+            volume_mm3=volume_mm3,
+            shape_proxy=shape_proxy,
+            error_message=None,
+        )
     except Exception as exc:
-        job_store.update(job_id, status='failed', error_message=str(exc), quality_metrics=None)
+        job_store.update(
+            job_id,
+            status='failed',
+            error_message=str(exc),
+            quality_metrics=None,
+            dimensions_mm=None,
+            volume_mm3=None,
+            shape_proxy=None,
+        )
 
     latest = job_store.get(job_id) or meta
     return JobCreateResponse(job_id=job_id, status=latest.status)
@@ -74,5 +102,8 @@ def get_job(job_id: str) -> JobStatusResponse:
         size=meta.size,
         created_at=meta.created_at,
         quality_metrics=meta.quality_metrics,
+        dimensions_mm=meta.dimensions_mm,
+        volume_mm3=meta.volume_mm3,
+        shape_proxy=meta.shape_proxy,
         error_message=meta.error_message,
     )

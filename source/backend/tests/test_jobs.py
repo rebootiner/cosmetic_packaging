@@ -76,9 +76,25 @@ def test_get_job_status_success_includes_quality_metrics(tmp_path, monkeypatch):
     assert data['content_type'] == 'image/png'
     assert data['size'] == len(png_bytes)
     assert 'created_at' in data
+
     assert data['quality_metrics'] is not None
     assert data['quality_metrics']['preprocess']['format'] == 'png'
     assert 'foreground_ratio' in data['quality_metrics']['segmentation']
+    assert 'overall_score' in data['quality_metrics']['shape_engine']
+
+    assert data['dimensions_mm'] is not None
+    assert set(data['dimensions_mm'].keys()) == {'width', 'height', 'depth'}
+    assert data['dimensions_mm']['width'] > 0
+    assert data['dimensions_mm']['height'] > 0
+    assert data['dimensions_mm']['depth'] > 0
+
+    assert data['volume_mm3'] is not None
+    assert data['volume_mm3'] > 0
+
+    assert data['shape_proxy'] is not None
+    assert 'shape_family' in data['shape_proxy']
+    assert 'aspect_ratio' in data['shape_proxy']
+
     assert data['error_message'] is None
 
 
@@ -105,6 +121,9 @@ def test_create_job_pipeline_failure_marks_failed(tmp_path, monkeypatch):
     data = res.json()
     assert data['status'] == 'failed'
     assert data['quality_metrics'] is None
+    assert data['dimensions_mm'] is None
+    assert data['volume_mm3'] is None
+    assert data['shape_proxy'] is None
     assert data['error_message'] == 'seg failed'
 
 

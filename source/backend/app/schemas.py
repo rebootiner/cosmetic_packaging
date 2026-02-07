@@ -17,4 +17,7 @@ class JobStatusResponse(BaseModel):
     size: int
     created_at: datetime
     quality_metrics: dict[str, Any] | None = None
+    dimensions_mm: dict[str, float] | None = None
+    volume_mm3: float | None = None
+    shape_proxy: dict[str, Any] | None = None
     error_message: str | None = None
