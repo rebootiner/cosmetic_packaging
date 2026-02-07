@@ -1,0 +1,6 @@
+.DS_Store
+.env.local
+__pycache__/
+*.pyc
+source/backend/.venv/
+source/frontend/node_modules/
