@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 import threading
 
 
@@ -13,6 +14,8 @@ class JobMeta:
     size: int
     file_path: str
     created_at: datetime
+    quality_metrics: dict[str, Any] | None = None
+    error_message: str | None = None
 
 
 class InMemoryJobStore:
@@ -27,6 +30,16 @@ class InMemoryJobStore:
     def get(self, job_id: str) -> JobMeta | None:
         with self._lock:
             return self._jobs.get(job_id)
+
+    def update(self, job_id: str, **fields: Any) -> JobMeta | None:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None:
+                return None
+            for key, value in fields.items():
+                if hasattr(job, key):
+                    setattr(job, key, value)
+            return job
 
     def clear(self) -> None:
         with self._lock:

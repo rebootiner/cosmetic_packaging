@@ -4,6 +4,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 
 from .config import settings
 from .db import check_db_connection
+from .image_pipeline import preprocess_image, segment_image
 from .schemas import JobCreateResponse, JobStatusResponse
 from .store import InMemoryJobStore, JobMeta, LocalFileStorage, utcnow
 
@@ -35,7 +36,7 @@ async def create_job(file: UploadFile = File(...)) -> JobCreateResponse:
 
     meta = JobMeta(
         job_id=job_id,
-        status='uploaded',
+        status='processing',
         filename=file.filename or 'upload.bin',
         content_type=file.content_type,
         size=len(content),
@@ -44,7 +45,19 @@ async def create_job(file: UploadFile = File(...)) -> JobCreateResponse:
     )
     job_store.create(meta)
 
-    return JobCreateResponse(job_id=job_id, status=meta.status)
+    try:
+        preprocess_meta = preprocess_image(content)
+        segment_meta = segment_image(content)
+        quality_metrics = {
+            'preprocess': preprocess_meta,
+            'segmentation': segment_meta,
+        }
+        job_store.update(job_id, status='processed', quality_metrics=quality_metrics, error_message=None)
+    except Exception as exc:
+        job_store.update(job_id, status='failed', error_message=str(exc), quality_metrics=None)
+
+    latest = job_store.get(job_id) or meta
+    return JobCreateResponse(job_id=job_id, status=latest.status)
 
 
 @app.get('/api/v1/jobs/{job_id}', response_model=JobStatusResponse)
@@ -60,4 +73,6 @@ def get_job(job_id: str) -> JobStatusResponse:
         content_type=meta.content_type,
         size=meta.size,
         created_at=meta.created_at,
+        quality_metrics=meta.quality_metrics,
+        error_message=meta.error_message,
     )

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -15,3 +16,5 @@ class JobStatusResponse(BaseModel):
     content_type: str
     size: int
     created_at: datetime
+    quality_metrics: dict[str, Any] | None = None
+    error_message: str | None = None
