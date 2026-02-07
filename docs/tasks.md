@@ -1,15 +1,16 @@
 # TASK Board (PM 관리)
 
 기준: Stage 1 (이미지 업로드 → 3D/치수 → 보정 → JSON)
+원칙: **UI First + 사용자 컨펌 후 개발 착수 + TDD**
 
-상태코드: BACKLOG / READY / IN_PROGRESS / DEV_DONE / TESTING / DONE / BLOCKED
+상태코드: BACKLOG / READY / UI_DESIGN / UI_REVIEW / WAITING_CONFIRM / IN_PROGRESS / DEV_DONE / TESTING / DONE / BLOCKED
 
 ---
 
 ## TASK-001 [READY] 개발환경 초기 설정
 
 ### 목표
-- 팀 공통 개발환경/실행환경을 재현 가능하게 구성
+- 팀 공통 개발환경/실행환경 재현 가능 구성
 
 ### 작업범위
 - `source/backend`, `source/frontend` 기본 구조 생성
@@ -23,32 +24,112 @@
 - 실행가이드 문서(`docs/setup.md`)
 
 ### TDD
-- 환경 검증 테스트(헬스체크/DB 연결) 먼저 작성
+- 환경 검증 테스트(헬스체크/DB 연결) 선작성
 
 ### 완료기준
 - 신규 개발자가 30분 내 로컬 실행 가능
 
 ---
 
-## TASK-002 [BACKLOG] 업로드 API + Job 상태관리
+## TASK-002 [READY] UI 정보구조(IA) + 사용자 플로우 설계
 
 ### 목표
-- 이미지 업로드 후 비동기 작업 생성/조회 가능
+- Stage1 전체 사용자 플로우 정의
 
 ### 작업범위
-- `POST /api/v1/jobs` 구현
-- `GET /api/v1/jobs/{job_id}` 구현
-- 파일 저장 및 메타 DB 기록
+- 업로드 → 자동분석 → 결과확인 → 치수수정(선택) → 확정 플로우 설계
+- 실패/예외 플로우(이미지 품질 낮음, 처리 실패) 정의
+
+### 담당
+- UIUX Expert
+
+### 산출물
+- `docs/ui_flow.md`
+- 화면 전이 다이어그램
+
+### 완료기준
+- PM 리뷰 통과
+
+---
+
+## TASK-003 [BACKLOG] UI 와이어프레임 제작
+
+### 목표
+- 핵심 4화면 와이어프레임 제작
+
+### 작업범위
+- 화면1: 업로드
+- 화면2: 자동 결과(3D+치수)
+- 화면3: 치수 보정
+- 화면4: 확정/저장
+
+### 담당
+- UIUX Expert
+
+### 산출물
+- `docs/wireframes_stage1.md` (또는 이미지)
+
+### 완료기준
+- 사용자 컨펌 요청 가능한 수준
+
+---
+
+## TASK-004 [BACKLOG] UIUX 전문가 리뷰 + 개선 반영
+
+### 목표
+- 와이어프레임 사용성 검증
+
+### 작업범위
+- 휴리스틱 리뷰(일관성/피드백/오류예방/가시성)
+- 개선안 반영
+
+### 담당
+- UIUX Expert
+
+### 산출물
+- `docs/uiux_review_report.md`
+
+### 완료기준
+- Approve 또는 Change Request 확정
+
+---
+
+## TASK-005 [BACKLOG] 사용자 UI 컨펌 게이트
+
+### 목표
+- 개발 착수 전 UI 확정
+
+### 작업범위
+- PM이 사용자에게 UI 시안 공유
+- 피드백 반영 및 최종 승인 획득
+
+### 산출물
+- `docs/ui_signoff.md`
+
+### 완료기준
+- 사용자 승인 기록 완료 (승인 전 DEV 착수 금지)
+
+---
+
+## TASK-006 [BACKLOG] 업로드 API + Job 상태관리
+
+### 목표
+- 이미지 업로드 후 비동기 작업 생성/조회
+
+### 작업범위
+- `POST /api/v1/jobs`
+- `GET /api/v1/jobs/{job_id}`
+- 파일 저장/메타 DB 기록
 
 ### TDD
-- 정상/실패 케이스 API 테스트 우선 작성
+- 정상/실패 API 테스트 선작성
 
 ### 완료기준
 - 업로드 시 job_id 반환, 상태조회 동작
 
 ---
 
-## TASK-003 [BACKLOG] 이미지 전처리/세그멘테이션
+## TASK-007 [BACKLOG] 이미지 전처리/세그멘테이션
 
 ### 목표
 - 제품 영역 마스크 추출
@@ -66,125 +147,87 @@
 
 ---
 
-## TASK-004 [BACKLOG] 형상 근사 엔진(Primitive Fitting)
+## TASK-008 [BACKLOG] 형상 근사 + 치수 산출 엔진
 
 ### 목표
-- 제품 형상 후보 생성 및 최적 모델 선택
+- 3D 근사 모델 + 치수/품질지표 계산
 
 ### 작업범위
-- box/cylinder/ellipsoid 후보 fitting
-- 오차 계산 및 best-fit 선택
-- hybrid proxy 생성
+- primitive fitting
+- width/depth/height/max_diameter/volume 산출
+- shape_confidence/tolerance 계산
 
 ### TDD
-- synthetic 데이터 기반 fitting 정확도 테스트
+- fitting/치수 계산 단위 테스트 선작성
 
 ### 완료기준
-- 기준 데이터에서 기대 형상 타입 선택 정확도 충족
+- 기준 샘플 오차 목표 충족
 
 ---
 
-## TASK-005 [BACKLOG] 치수 산출 엔진 + 품질지표
+## TASK-009 [BACKLOG] 결과 API + Geometry JSON + 보정 반영
 
 ### 목표
-- width/depth/height/max_diameter/volume 계산
-
-### 작업범위
-- 치수 계산 함수 구현
-- shape_confidence, tolerance 계산
-- `PATCH /dimensions` 보정 반영 로직
-
-### TDD
-- 치수 계산 단위 테스트 선작성
-- 보정 반영 테스트 선작성
-
-### 완료기준
-- 보정 전/후 결과 차이가 JSON에 정확히 반영
-
----
-
-## TASK-006 [BACKLOG] 결과 API + Geometry JSON 산출
-
-### 목표
-- 표준 결과(JSON + mesh URL) 제공
+- 표준 JSON 결과 제공 + 보정 반영
 
 ### 작업범위
 - `GET /api/v1/jobs/{job_id}/result`
-- JSON 스키마 검증 로직
-- GLB 산출물 경로 연결
+- `PATCH /api/v1/jobs/{job_id}/dimensions`
+- JSON 스키마 검증
 
 ### TDD
-- JSON schema validation 테스트 선작성
+- schema validation/보정 반영 테스트 선작성
 
 ### 완료기준
-- PRD 스키마 준수 100%
+- 보정 전/후 결과 JSON 정확 반영
 
 ---
 
-## TASK-007 [BACKLOG] 프론트엔드 업로드/결과/보정 UI
+## TASK-010 [BACKLOG] 프론트엔드 구현(컨펌 UI 기준)
 
 ### 목표
-- 사용자 입력 최소화 UX 구현
+- 컨펌된 UI를 코드로 구현
 
 ### 작업범위
-- 단일 업로드 화면
-- 결과화면(치수 + 신뢰도)
-- 보정 입력 UI
-- 상태 폴링/에러처리
+- 업로드/결과/보정/확정 화면 구현
+- 상태 폴링/에러 처리
+- Three.js 뷰어 연동
 
 ### TDD
-- 컴포넌트 테스트(렌더/입력/요청) 선작성
+- 컴포넌트/흐름 테스트 선작성
 
 ### 완료기준
 - 업로드→확정 사용자 클릭 5회 이내
 
 ---
 
-## TASK-008 [BACKLOG] 3D 뷰어 연동
-
-### 목표
-- 결과 형상을 브라우저에서 확인 가능
-
-### 작업범위
-- Three.js 기반 뷰어
-- 회전/줌/리셋
-- 치수 오버레이 표시
-
-### TDD
-- 뷰어 로딩/에셋 실패 처리 테스트
-
-### 완료기준
-- mesh 표시 + 기본 조작 동작
-
----
-
-## TASK-009 [BACKLOG] 통합 테스트/회귀 테스트
+## TASK-011 [BACKLOG] 통합 테스트/회귀 테스트
 
 ### 목표
 - E2E 안정성 확보
 
 ### 작업범위
 - 업로드→처리→조회→보정 E2E
-- 샘플셋 회귀테스트 파이프라인
+- 샘플셋 회귀 테스트
 - 성능 측정(평균 처리시간)
 
 ### TDD
-- E2E 실패 케이스 우선 작성
+- E2E 실패 케이스 선작성
 
 ### 완료기준
-- CI에서 테스트 통과, 회귀 기준선 저장
+- CI 통과 + 회귀 기준선 저장
 
 ---
 
-## TASK-010 [BACKLOG] 문서화/릴리즈 준비
+## TASK-012 [BACKLOG] 문서화/릴리즈 준비
 
 ### 목표
-- 사용자/개발자 문서 완료 및 릴리즈 준비
+- 사용자/개발자 문서 완료
 
 ### 작업범위
-- API 명세 문서
+- API 명세
 - 운영 매뉴얼
-- Known limitations 정리
+- known limitations
 
 ### 완료기준
 - MVP 데모 가능한 상태
