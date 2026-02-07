@@ -64,3 +64,23 @@ def test_parse_dimension_candidates_from_text_bytes():
     assert ('48.8', 48.8, None) in parsed
     assert ('27.9mm', 27.9, 'mm') in parsed
     assert ('13 mm', 13.0, 'mm') in parsed
+
+
+def test_parse_excludes_version_and_multi_dot_patterns():
+    raw = b'v2.0 size 13mm bad 12.34.56mm good 7mm'
+    result = extract_dimension_candidates(raw)
+
+    parsed_text = [item['text'] for item in result['items']]
+    assert '2.0' not in parsed_text
+    assert '12.34' not in parsed_text
+    assert '56mm' not in parsed_text
+    assert '13mm' in parsed_text
+    assert '7mm' in parsed_text
+
+
+def test_parse_normalizes_comma_decimal():
+    raw = b'D: 10,5mm'
+    result = extract_dimension_candidates(raw)
+
+    parsed = [(item['text'], item['value'], item['unit']) for item in result['items']]
+    assert ('10.5mm', 10.5, 'mm') in parsed
