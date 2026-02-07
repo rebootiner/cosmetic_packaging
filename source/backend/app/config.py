@@ -8,6 +8,7 @@ class Settings:
         "DATABASE_URL",
         "postgresql://postgres:postgres@db:5432/cosmetic_packaging",
     )
+    upload_dir: str = os.getenv("UPLOAD_DIR", "/tmp/cosmetic-packaging-ai/uploads")
 
 
 settings = Settings()
