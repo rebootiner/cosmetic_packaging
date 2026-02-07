@@ -2,7 +2,8 @@ const JSON_HEADERS = {
   'Content-Type': 'application/json',
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE || ''
+const rawBase = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_BASE ?? ''
+const API_BASE = rawBase.replace(/\/$/, '')
 
 async function handleResponse(response, defaultMessage) {
   if (!response.ok) {
@@ -48,4 +49,26 @@ export async function updateDimensions(jobId, dimensions) {
   })
 
   return handleResponse(response, '치수 저장에 실패했습니다.')
+}
+
+export async function extractOcr(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await fetch(`${API_BASE}/api/v1/ocr/extract`, {
+    method: 'POST',
+    body: formData,
+  })
+
+  return handleResponse(response, 'OCR 추출에 실패했습니다.')
+}
+
+export async function mapDimensions(payload) {
+  const response = await fetch(`${API_BASE}/api/v1/ocr/map-dimensions`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(payload),
+  })
+
+  return handleResponse(response, '치수 매핑에 실패했습니다.')
 }

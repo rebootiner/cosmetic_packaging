@@ -13,7 +13,7 @@ body {
 }
 
 .page {
-  max-width: 720px;
+  max-width: 980px;
   margin: 0 auto;
   padding: 32px 20px;
 }
@@ -57,12 +57,6 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
 label {
   display: flex;
   flex-direction: column;
@@ -70,7 +64,7 @@ label {
   gap: 6px;
 }
 
-input[type='number'] {
+input {
   border: 1px solid #d1d5db;
   border-radius: 8px;
   padding: 8px;
@@ -87,12 +81,6 @@ input[type='number'] {
   background: #fef2f2;
   color: #991b1b;
   border: 1px solid #fecaca;
-}
-
-.warning {
-  background: #fffbeb;
-  color: #92400e;
-  border: 1px solid #fde68a;
 }
 
 .success {
@@ -112,6 +100,63 @@ input[type='number'] {
   border-top: 3px solid #111827;
   border-radius: 50%;
   animation: spin 1s linear infinite;
+}
+
+.preview-frame {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fafafa;
+}
+
+.preview-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.overlay-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.bbox {
+  position: absolute;
+  border: 2px solid #ef4444;
+  background: rgba(239, 68, 68, 0.14);
+  pointer-events: auto;
+}
+
+.bbox span {
+  position: absolute;
+  top: -18px;
+  left: 0;
+  font-size: 11px;
+  background: #ef4444;
+  color: white;
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
+.list-panel {
+  margin-top: 16px;
+}
+
+.list-panel ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.list-row {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) 50px;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
 }
 
 pre {

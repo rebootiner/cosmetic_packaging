@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class OCRResultItemSchema(BaseModel):
@@ -54,3 +54,25 @@ class DimensionPatchRequest(BaseModel):
     depth: float
     height: float
     max_diameter: float | None = None
+
+
+class OCRItemInput(BaseModel):
+    text: str = ''
+    value: float | None = None
+    unit: str | None = None
+    confidence: float = 0.0
+
+
+class DimensionMappingItem(BaseModel):
+    target: str
+    value_mm: float
+    confidence: float
+    source_text: str
+    source_index: int
+    reason: str
+
+
+class OCRMapDimensionsResponse(BaseModel):
+    mapped_dimensions_mm: dict[str, float] = Field(default_factory=dict)
+    mapping_items: list[DimensionMappingItem] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)

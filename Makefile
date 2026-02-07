@@ -9,3 +9,12 @@ frontend-dev:
 
 up:
 	docker compose up --build
+
+up-stage1-light:
+	docker compose -f docker-compose.yml -f docker-compose.stage1-light.yml up --build backend frontend
+
+down-stage1-light:
+	docker compose -f docker-compose.yml -f docker-compose.stage1-light.yml down
+
+demo-stage1:
+	$(MAKE) up-stage1-light

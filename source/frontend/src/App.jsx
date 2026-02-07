@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { createJob, getJob, getJobResult, updateDimensions } from './api'
+import React, { useMemo, useState } from 'react'
+import { extractOcr, mapDimensions } from './api'
 
 const STEP = {
   LANDING: 1,
@@ -8,16 +8,76 @@ const STEP = {
   RESULT: 4,
 }
 
-const POLL_MS = 2000
+function normalizeBbox(item) {
+  const bbox = item?.bbox || item?.box || item?.bounding_box || item?.boundingBox
+  if (!bbox) return null
 
-function extractDimensions(payload) {
-  if (!payload) return { width: '', height: '', depth: '' }
-  const source = payload.dimensions_mm || payload.data?.dimensions_mm || payload.result?.dimensions_mm || payload
-  return {
-    width: source.width ?? '',
-    height: source.height ?? '',
-    depth: source.depth ?? '',
+  if (Array.isArray(bbox) && bbox.length === 4) {
+    const [x, y, width, height] = bbox
+    return { x: Number(x) || 0, y: Number(y) || 0, width: Number(width) || 0, height: Number(height) || 0 }
   }
+
+  if (Array.isArray(bbox) && bbox.length >= 2) {
+    const xs = bbox.map((p) => Number(p?.x ?? p?.[0] ?? 0))
+    const ys = bbox.map((p) => Number(p?.y ?? p?.[1] ?? 0))
+    const minX = Math.min(...xs)
+    const maxX = Math.max(...xs)
+    const minY = Math.min(...ys)
+    const maxY = Math.max(...ys)
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+  }
+
+  if (typeof bbox === 'object') {
+    const x = Number(bbox.x ?? bbox.left ?? 0)
+    const y = Number(bbox.y ?? bbox.top ?? 0)
+    const width = Number(bbox.width ?? (bbox.right != null ? Number(bbox.right) - x : 0))
+    const height = Number(bbox.height ?? (bbox.bottom != null ? Number(bbox.bottom) - y : 0))
+    return { x, y, width, height }
+  }
+
+  return null
+}
+
+function normalizeOcrItems(payload) {
+  const candidates = payload?.items || payload?.results || payload?.ocr || payload?.data?.items || payload?.data?.ocr || []
+  if (!Array.isArray(candidates)) return []
+
+  return candidates.map((item, index) => ({
+    id: item?.id || `ocr-${index}`,
+    key: item?.key || item?.label || item?.name || `item-${index + 1}`,
+    text: item?.text || item?.value || '',
+    value: item?.value ?? item?.text ?? '',
+    bbox: normalizeBbox(item),
+    confidence: item?.confidence,
+  }))
+}
+
+function normalizeDimensionItems(payload) {
+  const mapped = payload?.dimensions || payload?.data?.dimensions || payload?.mapped_dimensions || []
+  if (Array.isArray(mapped) && mapped.length) {
+    return mapped.map((item, index) => ({
+      id: item?.id || `dim-${index}`,
+      key: item?.key || item?.name || item?.label || `dimension-${index + 1}`,
+      value: item?.value ?? '',
+      unit: item?.unit || 'mm',
+      sourceText: item?.source_text || item?.text || '',
+      bbox: normalizeBbox(item),
+    }))
+  }
+
+  const dims = payload?.dimensions_mm || payload?.data?.dimensions_mm || payload?.result?.dimensions_mm
+  if (dims && typeof dims === 'object') {
+    return Object.entries(dims).map(([key, value]) => ({
+      id: key,
+      key,
+      value: value ?? '',
+      unit: 'mm',
+      sourceText: '',
+      bbox: null,
+    }))
+  }
+
+  return []
 }
 
 export function LandingStep({ onPick }) {
@@ -33,13 +93,84 @@ export function LandingStep({ onPick }) {
   )
 }
 
-export function AnalyzingStep({ jobId, status }) {
+function OcrOverlay({ imageUrl, items }) {
+  const hasBbox = items.some((item) => item.bbox)
+
+  return (
+    <div>
+      <div className="preview-frame">
+        <img src={imageUrl} alt="업로드 원본 미리보기" className="preview-image" />
+        {hasBbox && (
+          <div className="overlay-layer" data-testid="overlay-layer">
+            {items.map((item) =>
+              item.bbox ? (
+                <div
+                  key={item.id}
+                  className="bbox"
+                  title={`${item.key}: ${item.value}`}
+                  style={{
+                    left: `${item.bbox.x}%`,
+                    top: `${item.bbox.y}%`,
+                    width: `${item.bbox.width}%`,
+                    height: `${item.bbox.height}%`,
+                  }}
+                >
+                  <span>{item.key}</span>
+                </div>
+              ) : null,
+            )}
+          </div>
+        )}
+      </div>
+
+      {!hasBbox && (
+        <p className="hint" data-testid="no-bbox-hint">
+          bbox 정보가 없어 리스트만 표시합니다.
+        </p>
+      )}
+    </div>
+  )
+}
+
+export function ResultPanel({ imageUrl, ocrItems, dimensionItems, onEdit, onConfirm, confirming, exportJson }) {
   return (
     <section className="card">
-      <h2>분석 중</h2>
-      <div className="spinner" aria-label="loading" />
-      <p>작업 ID: {jobId}</p>
-      <p>현재 상태: {status || 'processing'}</p>
+      <h2>분석 결과</h2>
+      <p className="hint">원본 이미지와 OCR 결과를 확인하고 치수를 수동 보정하세요.</p>
+
+      <OcrOverlay imageUrl={imageUrl} items={ocrItems} />
+
+      <div className="list-panel">
+        <h3>추출 치수</h3>
+        <ul>
+          {dimensionItems.map((item) => (
+            <li key={item.id} className="list-row" data-testid="dimension-row">
+              <strong>{item.key}</strong>
+              <input
+                aria-label={`${item.key} value`}
+                value={item.value}
+                onChange={(e) => onEdit(item.id, e.target.value)}
+              />
+              <span>{item.unit}</span>
+            </li>
+          ))}
+        </ul>
+
+        {dimensionItems.length === 0 && <p className="hint">추출된 치수가 없습니다.</p>}
+
+        <div className="actions">
+          <button type="button" onClick={onConfirm} disabled={confirming || dimensionItems.length === 0}>
+            {confirming ? '확정 중...' : '치수 확정'}
+          </button>
+        </div>
+      </div>
+
+      {exportJson && (
+        <details open>
+          <summary>JSON export 미리보기</summary>
+          <pre data-testid="json-preview">{JSON.stringify(exportJson, null, 2)}</pre>
+        </details>
+      )}
     </section>
   )
 }
@@ -47,15 +178,15 @@ export function AnalyzingStep({ jobId, status }) {
 export default function App() {
   const [step, setStep] = useState(STEP.LANDING)
   const [file, setFile] = useState(null)
-  const [jobId, setJobId] = useState('')
-  const [jobStatus, setJobStatus] = useState('')
-  const [result, setResult] = useState(null)
-  const [dimensions, setDimensions] = useState({ width: '', height: '', depth: '' })
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [ocrItems, setOcrItems] = useState([])
+  const [dimensionItems, setDimensionItems] = useState([])
+  const [rawResult, setRawResult] = useState(null)
+  const [exportJson, setExportJson] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState('')
-  const [warning, setWarning] = useState('')
-  const [savedMessage, setSavedMessage] = useState('')
+  const [statusMessage, setStatusMessage] = useState('')
 
   const validation = useMemo(() => {
     if (!file) return { valid: false, message: '이미지 파일을 선택해 주세요.' }
@@ -66,113 +197,75 @@ export default function App() {
 
   const onFilePick = (event) => {
     const selected = event.target.files?.[0]
-    setSavedMessage('')
     setError('')
+    setStatusMessage('')
+    setExportJson(null)
+    setRawResult(null)
     if (!selected) return
 
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    setPreviewUrl(URL.createObjectURL(selected))
     setFile(selected)
-    setWarning(selected.size > 5 * 1024 * 1024 ? '파일 크기가 커서 분석 시간이 길어질 수 있습니다.' : '')
     setStep(STEP.VALIDATE)
   }
 
   const startAnalysis = async () => {
     if (!validation.valid || !file) return
     setLoading(true)
+    setStep(STEP.ANALYZING)
     setError('')
-    setSavedMessage('')
+    setStatusMessage('OCR 추출 요청 중...')
 
     try {
-      const payload = await createJob(file)
-      const id = payload?.job_id || payload?.id || payload?.jobId || payload?.data?.job_id || payload?.data?.id
-      if (!id) throw new Error('작업 ID를 받지 못했습니다.')
+      const ocrPayload = await extractOcr(file)
+      const parsedOcr = normalizeOcrItems(ocrPayload)
+      setOcrItems(parsedOcr)
 
-      const status = (payload?.status || 'processing').toLowerCase()
-      setJobId(String(id))
-      setJobStatus(status)
+      setStatusMessage('치수 매핑 요청 중...')
+      const mapPayload = await mapDimensions({ ocr: parsedOcr, raw: ocrPayload })
+      const parsedDimensions = normalizeDimensionItems(mapPayload)
+      setDimensionItems(parsedDimensions)
+      setRawResult({ ocrPayload, mapPayload })
 
-      if (status === 'processed') {
-        await fetchResult(String(id))
-      } else {
-        setStep(STEP.ANALYZING)
-      }
+      setStatusMessage('분석 완료')
+      setStep(STEP.RESULT)
     } catch (e) {
-      setError(e.message || '분석 시작에 실패했습니다.')
+      setError(e.message || '분석 중 오류가 발생했습니다.')
+      setStep(STEP.VALIDATE)
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchResult = async (id) => {
-    const data = await getJobResult(id)
-    const parsed = extractDimensions(data)
-    setResult(data)
-    setDimensions(parsed)
-    setStep(STEP.RESULT)
+  const onEditDimension = (id, value) => {
+    setExportJson(null)
+    setDimensionItems((prev) => prev.map((item) => (item.id === id ? { ...item, value } : item)))
   }
 
-  useEffect(() => {
-    if (step !== STEP.ANALYZING || !jobId) return undefined
-
-    let cancelled = false
-    const timer = setInterval(async () => {
-      try {
-        const statusPayload = await getJob(jobId)
-        const status = (statusPayload?.status || statusPayload?.data?.status || '').toLowerCase()
-        if (cancelled) return
-
-        setJobStatus(status || 'processing')
-
-        if (status === 'done' || status === 'completed' || status === 'success' || status === 'processed') {
-          clearInterval(timer)
-          await fetchResult(jobId)
-        }
-
-        if (status === 'failed' || status === 'error') {
-          clearInterval(timer)
-          setError('분석 작업이 실패했습니다.')
-        }
-      } catch (e) {
-        clearInterval(timer)
-        if (!cancelled) setError(e.message || '작업 상태 조회 중 오류가 발생했습니다.')
-      }
-    }, POLL_MS)
-
-    return () => {
-      cancelled = true
-      clearInterval(timer)
-    }
-  }, [step, jobId])
-
-  const onDimensionChange = (key, value) => {
-    setSavedMessage('')
-    setDimensions((prev) => ({ ...prev, [key]: value }))
-  }
-
-  const saveDimensions = async () => {
-    if (!jobId) return
-    setSaving(true)
+  const onConfirm = async () => {
+    setConfirming(true)
     setError('')
     try {
-      const payload = await updateDimensions(jobId, {
-        width: Number(dimensions.width),
-        height: Number(dimensions.height),
-        depth: Number(dimensions.depth),
-      })
-      const latest = extractDimensions(payload)
-      setDimensions(latest)
-      setSavedMessage('치수 저장이 완료되었습니다.')
+      const payload = {
+        confirmed_dimensions: dimensionItems.map((item) => ({
+          key: item.key,
+          value: item.value,
+          unit: item.unit,
+        })),
+      }
+      setExportJson(payload)
+      setStatusMessage('치수 확정 완료')
     } catch (e) {
-      setError(e.message || '치수 저장 중 오류가 발생했습니다.')
+      setError(e.message || '치수 확정 중 오류가 발생했습니다.')
     } finally {
-      setSaving(false)
+      setConfirming(false)
     }
   }
 
   return (
     <main className="page">
       {error && <p className="message error">⚠ {error}</p>}
-      {warning && <p className="message warning">⚠ {warning}</p>}
-      {savedMessage && <p className="message success">✓ {savedMessage}</p>}
+      {statusMessage && <p className="message success">{statusMessage}</p>}
 
       {step === STEP.LANDING && <LandingStep onPick={onFilePick} />}
 
@@ -192,57 +285,31 @@ export default function App() {
         </section>
       )}
 
-      {step === STEP.ANALYZING && <AnalyzingStep jobId={jobId} status={jobStatus} />}
+      {step === STEP.ANALYZING && (
+        <section className="card">
+          <h2>분석 중</h2>
+          <div className="spinner" aria-label="loading" />
+          <p>{statusMessage || '요청 처리 중...'}</p>
+        </section>
+      )}
 
       {step === STEP.RESULT && (
-        <section className="card">
-          <h2>분석 결과</h2>
-          <p>작업 ID: {jobId}</p>
-          <p className="hint">아래 치수를 수정한 뒤 저장할 수 있습니다.</p>
+        <ResultPanel
+          imageUrl={previewUrl}
+          ocrItems={ocrItems}
+          dimensionItems={dimensionItems}
+          onEdit={onEditDimension}
+          onConfirm={onConfirm}
+          confirming={confirming}
+          exportJson={exportJson}
+        />
+      )}
 
-          <div className="grid">
-            <label>
-              Width (mm)
-              <input
-                type="number"
-                value={dimensions.width}
-                onChange={(e) => onDimensionChange('width', e.target.value)}
-              />
-            </label>
-            <label>
-              Height (mm)
-              <input
-                type="number"
-                value={dimensions.height}
-                onChange={(e) => onDimensionChange('height', e.target.value)}
-              />
-            </label>
-            <label>
-              Depth (mm)
-              <input
-                type="number"
-                value={dimensions.depth}
-                onChange={(e) => onDimensionChange('depth', e.target.value)}
-              />
-            </label>
-          </div>
-
-          <div className="actions">
-            <button type="button" onClick={saveDimensions} disabled={saving}>
-              {saving ? '저장 중...' : '치수 저장'}
-            </button>
-            <button type="button" onClick={() => setStep(STEP.LANDING)}>
-              새 작업 시작
-            </button>
-          </div>
-
-          {result && (
-            <details>
-              <summary>원본 응답 보기</summary>
-              <pre>{JSON.stringify(result, null, 2)}</pre>
-            </details>
-          )}
-        </section>
+      {rawResult && step === STEP.RESULT && (
+        <details>
+          <summary>원본 응답 보기</summary>
+          <pre>{JSON.stringify(rawResult, null, 2)}</pre>
+        </details>
       )}
     </main>
   )

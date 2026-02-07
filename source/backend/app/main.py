@@ -1,9 +1,11 @@
+import json
 from uuid import uuid4
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
 from .config import settings
 from .db import check_db_connection
+from .dimension_mapper import map_dimensions
 from .image_pipeline import preprocess_image, segment_image
 from .ocr_engine import extract_dimension_candidates
 from .schemas import (
@@ -12,6 +14,8 @@ from .schemas import (
     JobCreateResponse,
     JobStatusResponse,
     OCRExtractionResponse,
+    OCRItemInput,
+    OCRMapDimensionsResponse,
 )
 from .shape_engine import build_shape_proxy, compute_dimensions, compute_quality_metrics
 from .store import InMemoryJobStore, JobMeta, LocalFileStorage, utcnow
@@ -107,6 +111,34 @@ async def create_job(file: UploadFile = File(...)) -> JobCreateResponse:
 
     latest = job_store.get(job_id) or meta
     return JobCreateResponse(job_id=job_id, status=latest.status)
+
+
+@app.post('/api/v1/ocr/map-dimensions', response_model=OCRMapDimensionsResponse)
+async def map_ocr_dimensions(
+    file: UploadFile | None = File(default=None),
+    ocr_items: str | None = Form(default=None),
+) -> OCRMapDimensionsResponse:
+    parsed_items: list[dict] = []
+
+    if ocr_items:
+        try:
+            raw = json.loads(ocr_items)
+            if not isinstance(raw, list):
+                raise ValueError('ocr_items must be a list')
+            parsed_items = [OCRItemInput(**item).model_dump() for item in raw]
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f'Invalid ocr_items payload: {exc}') from exc
+
+    if not parsed_items:
+        if file is None:
+            raise HTTPException(status_code=400, detail='Provide at least one of file or ocr_items')
+        if not file.content_type or not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail='Only image uploads are allowed')
+        content = await file.read()
+        parsed_items = extract_dimension_candidates(content).get('items', [])
+
+    result = map_dimensions(parsed_items)
+    return OCRMapDimensionsResponse(**result)
 
 
 @app.get('/api/v1/jobs/{job_id}', response_model=JobStatusResponse)
