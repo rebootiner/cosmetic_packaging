@@ -5,11 +5,13 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from .config import settings
 from .db import check_db_connection
 from .image_pipeline import preprocess_image, segment_image
+from .ocr_engine import extract_dimension_candidates
 from .schemas import (
     DimensionPatchRequest,
     GeometryOutput,
     JobCreateResponse,
     JobStatusResponse,
+    OCRExtractionResponse,
 )
 from .shape_engine import build_shape_proxy, compute_dimensions, compute_quality_metrics
 from .store import InMemoryJobStore, JobMeta, LocalFileStorage, utcnow
@@ -33,6 +35,16 @@ def health() -> dict:
 def health_db() -> dict:
     ok = check_db_connection()
     return {'status': 'ok' if ok else 'error', 'database': ok}
+
+
+@app.post('/api/v1/ocr/extract', response_model=OCRExtractionResponse)
+async def extract_ocr_dimensions(file: UploadFile = File(...)) -> OCRExtractionResponse:
+    # Stage1 lightweight / no DB persistence
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail='Only image uploads are allowed')
+
+    content = await file.read()
+    return OCRExtractionResponse(**extract_dimension_candidates(content))
 
 
 @app.post('/api/v1/jobs', response_model=JobCreateResponse, status_code=201)

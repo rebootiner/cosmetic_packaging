@@ -1,7 +1,8 @@
 # TASK Board (PM 관리)
 
-기준: Stage 1 (이미지 업로드 → 3D/치수 → 보정 → JSON)
+기준: Stage 1 (이미지 업로드 → OCR 치수추출/검증 → 보정 → JSON)
 원칙: **UI First + 사용자 컨펌 후 개발 착수 + TDD**
+추가 원칙(확정): **Stage 1에서는 DB 저장을 사용하지 않음(메모리/파일 기반 임시 처리)**
 
 상태코드: BACKLOG / READY / UI_DESIGN / UI_REVIEW / WAITING_CONFIRM / IN_PROGRESS / DEV_DONE / TESTING / DONE / BLOCKED
 
@@ -228,6 +229,76 @@
 - API 명세
 - 운영 매뉴얼
 - known limitations
+- Stage1 비DB 정책 반영 문서화
 
 ### 완료기준
 - MVP 데모 가능한 상태
+
+---
+
+## TASK-013 [IN_PROGRESS] OCR 치수 추출 파이프라인(백엔드)
+
+### 목표
+- 도면/이미지 내 치수 텍스트를 OCR로 추출해 구조화
+
+### 작업범위
+- OCR 엔진 연동(숫자/소수/단위 인식)
+- 추출 결과 스키마(`text`, `value`, `unit`, `bbox`, `confidence`) 정의
+- Stage1 비DB 원칙에 맞춰 메모리/파일 임시 처리
+
+### TDD
+- 샘플 도면 이미지 기준 추출 성공/실패 테스트 선작성
+
+### 완료기준
+- 샘플셋에서 핵심 치수 텍스트 추출 가능
+
+---
+
+## TASK-014 [READY] 치수선-숫자 매핑 및 Geometry 보정 엔진
+
+### 목표
+- OCR 숫자를 도면 구조(치수선/구간/전체치수)와 매핑
+
+### 작업범위
+- 치수선/화살표/기준선 검출 규칙 추가
+- 매핑 결과로 `dimensions_mm` 계산/보정
+- 충돌/중복 치수 처리 규칙 정의
+
+### TDD
+- 기준 이미지별 expected dimensions 검증 테스트
+
+### 완료기준
+- 도면 기반 치수 결과가 현재 고정 scale 추정보다 유의미하게 개선
+
+---
+
+## TASK-015 [READY] 결과 화면 오버레이 렌더링 + 수동 보정 UX
+
+### 목표
+- 마지막 화면에서 OCR/치수 추출 결과를 시각적으로 검증 가능하게 표시
+
+### 작업범위
+- 원본 이미지 위 bbox/치수 라벨 오버레이
+- 추출 치수 리스트 패널 + 인라인 수정
+- 사용자 확정 시 최종 JSON 내보내기
+
+### TDD
+- 오버레이 렌더/수정/확정 플로우 테스트
+
+### 완료기준
+- 사용자가 추출값을 보고 즉시 수정/확정 가능
+
+---
+
+## TASK-016 [BACKLOG] Stage1 경량 아키텍처 정리(DB 비의존)
+
+### 목표
+- Stage1 실행 구성을 경량화하여 재현성/테스트 편의 향상
+
+### 작업범위
+- docker-compose에서 Stage1 경로의 DB 의존 제거(또는 optional화)
+- frontend-backend 연결 안정화(proxy/base URL)
+- 로컬 실행 가이드 간소화
+
+### 완료기준
+- `docker compose up` + 최소 명령으로 데모 가능
