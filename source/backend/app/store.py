@@ -19,6 +19,7 @@ class JobMeta:
     volume_mm3: float | None = None
     shape_proxy: dict[str, Any] | None = None
     error_message: str | None = None
+    user_corrections: list[dict[str, Any]] | None = None
 
 
 class InMemoryJobStore:

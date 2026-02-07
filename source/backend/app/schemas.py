@@ -21,3 +21,22 @@ class JobStatusResponse(BaseModel):
     volume_mm3: float | None = None
     shape_proxy: dict[str, Any] | None = None
     error_message: str | None = None
+    user_corrections: list[dict[str, Any]] | None = None
+
+
+class GeometryOutput(BaseModel):
+    job_id: str
+    status: str
+    dimensions_mm: dict[str, float] | None = None
+    volume_mm3: float | None = None
+    shape_proxy: dict[str, Any] | None = None
+    quality_metrics: dict[str, Any] | None = None
+    error_message: str | None = None
+    source_type: str = 'image'
+
+
+class DimensionPatchRequest(BaseModel):
+    width: float
+    depth: float
+    height: float
+    max_diameter: float | None = None

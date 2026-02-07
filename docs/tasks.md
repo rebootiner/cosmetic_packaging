@@ -165,7 +165,7 @@
 
 ---
 
-## TASK-009 [BACKLOG] 결과 API + Geometry JSON + 보정 반영
+## TASK-009 [DONE] 결과 API + Geometry JSON + 보정 반영
 
 ### 목표
 - 표준 JSON 결과 제공 + 보정 반영
