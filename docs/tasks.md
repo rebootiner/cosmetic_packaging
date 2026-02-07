@@ -94,7 +94,7 @@
 
 ---
 
-## TASK-005 [WAITING_CONFIRM] 사용자 UI 컨펌 게이트
+## TASK-005 [DONE] 사용자 UI 컨펌 게이트
 
 ### 목표
 - 개발 착수 전 UI 확정
