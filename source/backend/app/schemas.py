@@ -4,6 +4,20 @@ from typing import Any
 from pydantic import BaseModel
 
 
+class OCRResultItemSchema(BaseModel):
+    text: str
+    value: float
+    unit: str | None = None
+    bbox: list[int] | None = None
+    confidence: float
+
+
+class OCRExtractionResponse(BaseModel):
+    items: list[OCRResultItemSchema]
+    engine_available: bool
+    message: str
+
+
 class JobCreateResponse(BaseModel):
     job_id: str
     status: str
