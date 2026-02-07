@@ -1,0 +1,20 @@
+version: '3.9'
+services:
+  backend:
+    depends_on: []
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/cosmetic_packaging}
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./source/frontend:/app
+    environment:
+      VITE_API_PROXY_TARGET: ${VITE_API_PROXY_TARGET:-http://backend:8000}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - '5173:5173'
+    depends_on:
+      - backend

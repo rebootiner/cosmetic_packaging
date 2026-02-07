@@ -9,12 +9,12 @@
 - `source/backend` : FastAPI
 - `source/frontend` : React (Vite)
 
-## 3) Run backend + DB with Docker
+## 3) Run backend + DB with Docker (기존 경로)
 ```bash
 cp .env.example .env.local
 # (optional) edit values
 
-docker compose up --build
+make up
 ```
 
 Backend health check:
@@ -22,6 +22,13 @@ Backend health check:
 curl http://localhost:8000/health
 curl http://localhost:8000/health/db
 ```
+
+## 3-1) Run Stage1 Light (DB 비의존, 권장 데모 경로)
+```bash
+make demo-stage1
+```
+
+상세 가이드: `docs/setup_stage1_light.md`
 
 ## 4) Run backend tests (TDD baseline)
 ```bash
